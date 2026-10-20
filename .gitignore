@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Data, weights and experiment outputs (too large / not public)
+dataset/
+result/
+*.tif
+*.tiff
+*.pt
+*.pth
+*.safetensors
+*.log
+*.bak
+
+# Environment
+.env
+.venv/

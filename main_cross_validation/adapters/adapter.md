@@ -15,10 +15,10 @@
 本交接包已**精簡至 3 個適配器**，於 `experiments.yaml` 的 `architecture` 欄位指定。
 （清單以 `@register_model('...')` 實際註冊的名稱為準。）
 
-### 主力模型（本研究最終使用）
-*   **`segformer_deepsup`** ★：SegFormer-B5 + 深監督輔助頭（deep-supervision aux）。**本研究所有最終實驗（DV5 LS-SAR-Oil、M4D 二元 / 多類別）採用的主力架構**。支援 Binary 與 Multiclass、aux loss 動態排程、EMA、Freeze Epochs、WeightedSampler、進階視覺化等完整訓練技巧（見第 5、6 節）。檔案：`segformer_adapter_deepsup.py`。
+### 主力模型
+*   **`segformer_deepsup`** ★：SegFormer-B5 + 深監督輔助頭（deep-supervision aux）。**DV5、M4D 二元 / 多類別實驗採用的主力架構**。支援 Binary 與 Multiclass、aux loss 動態排程、EMA、Freeze Epochs、WeightedSampler、進階視覺化等完整訓練技巧（見第 5、6 節）。檔案：`segformer_adapter_deepsup.py`。
 
-### 比較對象（論文 baseline）
+### 比較對象（baseline）
 *   **`segformer`**：原始 SegFormer-B5（無輔助頭）。作為主力的消融對照。檔案：`segformer_adapter.py`。
 *   **`osdmamba_official`**：OSDMamba 官方實作（VMamba / SSM，需 `mamba_ssm` 依賴；缺少時該 adapter 會自動被略過）。檔案：`osdmamba_official_adapter.py`。
 
