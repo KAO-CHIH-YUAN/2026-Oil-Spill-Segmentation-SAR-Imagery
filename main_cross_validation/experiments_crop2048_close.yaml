@@ -1,0 +1,78 @@
+# 裁切消融 實驗1/3：crop 2048 → resize 512 (= 參考主法重現; VV→HNM→rebind RGB close)
+#   超參數完全比照參考 config (20260623 Segformer_deepsup DV5-RGB-LandNeutral-close)。
+#   與 1024/512 唯一差異：nested_folds_base_dir + reconstruction.original_patch_size(=2048)。
+#   執行(在 OIL_Project_Handoff/ 下)：
+#     python -m main_cross_validation.main_runner --config experiments_crop2048_close.yaml
+results_base_dir: '/home/yuan/Yuan/OIL_Project_12_7/OIL_Project_Handoff/result/model/DV5_cropablation'
+excel_log_path: '/home/yuan/Yuan/OIL_Project_12_7/OIL_Project_Handoff/result/excel_log/DV5_cropablation.xlsx'
+experiments:
+  - experiment_name: 'Segformer_deepsup_DV5-close_crop2048'
+    mode: 'train'
+    architecture: 'segformer_deepsup'
+    architecture_cfg:
+      aux_loss_weight: 0.3
+      aux_delay_epochs: 10
+      aux_warmup_epochs: 30
+      in_channels: 3
+      hf_model_name: '/home/yuan/Yuan/OIL_Project_12_7/OIL_Project_Handoff/pretrain/local_model/segformer-b5'
+      aux_in_channels: 320
+      drop_path_rate: 0.3
+      classifier_dropout_prob: 0
+      land_as_class: false
+    cross_validation:
+      enabled: True
+      mode: nested_folds
+      nested_folds_base_dir: '/home/yuan/Yuan/OIL_Project_12_7/OIL_Project_Handoff/dataset/DV5_SAR_Land_Patch/HNM_P2048_OUni512_BG100_RGB_LandNeutral_close_nested'
+      folds_subpath: 'Global_Dataset_Ratio_1_1.5'
+      single_fold_only: False   # 先確認正確性時可暫設 True(只跑 1 fold)
+      val_ratio: 0.2
+      val_seed: 43
+      scene_level_events: ["沉船 1487","疑似油污","艙底水排放","似乎源自石油平台","Taylor 平台","破損管道","天然滲漏點"]
+    base_model: ''
+    dataset:
+      path: '/unused/placeholder/will-be-overridden-per-fold'
+    imgsz: 512
+    train:
+      epochs: 70
+      loss_function: 'focal_iou_ls'
+      imgsz: 512
+      batch_size: 12
+      workers: 4
+      patience: 20
+      lr0: 0.0001
+      weight_decay: 0.02
+      amp: true
+      use_weighted_sampler: true
+      freeze_epochs: 10
+      degrees: 45
+      translate: 0.3
+      fliplr: 0.5
+      flipud: 0.5
+      coarse_dropout: 0.1
+      cutmix: 0.1
+      cutmix_alpha: 1.0
+      copy_paste: 0.1
+      gradient_accumulation_steps: 4
+      random_brightness: 0.2
+      random_contrast: 0.2
+    post_tests:
+      - test_name: 'crop2048_close'
+        dataset:
+          path: '/unused/placeholder/will-be-overridden-per-fold'
+        reconstruction:
+          enabled: true
+          original_data_root: '/home/yuan/Yuan/OIL_Project_12_7/OIL_Project_Handoff/dataset/DV5_SAR_Preprocess_Output/Step4_Dataset'
+          original_patch_size: 2048
+          gpu_stitch: true
+          compute_hd95: true
+          vis_include_original: false
+        categorized_predictions:
+          batch_size: 24
+          async_writers: 4
+          save_tn: false
+        evaluation_on_original:
+          enabled: true
+          original_data_root: '/unused/placeholder/will-be-overridden-per-fold'
+        draw_bounding_boxes: false
+        grad_cam:
+          enabled: false

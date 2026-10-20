@@ -1,0 +1,57 @@
+# =====================================================================
+# 上游前處理單一設定檔 (DV5 Step1–4)
+# 只需在這裡設定一次，orchestrator (run_upstream_preprocess.py) 會依序連續跑 Step1→Step4。
+# 路徑中的 {handoff_root} / {output_base} 會由載入器 (_pp_config.py) 自動代換。
+# =====================================================================
+
+# ── 根路徑（換機器只改這一行 handoff_root）──────────────────────────
+handoff_root: /home/yuan/Yuan/OIL_Project_12_7/OIL_Project_Handoff
+
+# 重跑輸出的根目錄（Step1-4 全部輸出在此，不動原專案）
+output_base: "{handoff_root}/dataset/DV5_SAR_Preprocess_Output"
+
+# ── 輸入資料（你提供）────────────────────────────────────────────
+inputs:
+  tif_root:              "{handoff_root}/dataset/DV5_All_TIF"                         # 原始 SAR TIF (<事件>/<日期_衛星>/*.tif)
+  annotation_json_root:  "{handoff_root}/dataset/DV5_All_TIF_CorrectName-JSON-EventDist"  # 油污標註 JSON (已校正長名)
+  source_dataset:        "{handoff_root}/dataset/DV5_SAR_All"                          # Step4 train/test 切分來源(僅讀結構/檔名；此處為 0-byte 骨架)
+  excel_path:            "{handoff_root}/preprocessing/DV5_SAR_Land_upstream_Preprocess/PNG_JSON_Match_Report.xlsx"  # Step4 校正名對應表
+  # OSM 陸地多邊形快取(~916MB)。指向交接包內；首次執行 Step1 會自動下載到此(驗證可重現性)。
+  osm_cache:             "{handoff_root}/dataset/osm_cache"
+
+# ── 執行範圍（orchestrator 預設）────────────────────────────────
+# 預設連續跑 Step1→Step4。若後續不想做 Step4(檔名校正/切分組裝)，把 to 改成 3 即可停在 Step3。
+# 命令列 --from/--to 仍可臨時覆寫此預設。
+run:
+  from: 1
+  to: 4
+
+# ── 各步驟輸出子目錄名（相對 output_base，一般不用改）───────────────
+outputs:
+  step1_landjson: Step1_LandJSON
+  step1_overlay:  Step1_Overlay
+  step2_merged:   Step2_MergedJSON
+  step3_png:      Step3_PNG
+  step3_mask:     Step3_Mask
+  step4_dataset:  Step4_Dataset
+
+# ── Step1：TIF → 陸地 JSON + overlay ────────────────────────────
+step1:
+  osm_url: "https://osmdata.openstreetmap.de/download/land-polygons-complete-4326.zip"
+  osm_shp_rel: "land-polygons-complete-4326/land_polygons.shp"
+  min_land_pixels: 20        # 小於此面積(像素)的陸地多邊形捨棄
+  overlay_scale: 0.5         # overlay JPG 縮放
+  overlay_maxdim: 4096       # overlay 最長邊上限
+  jpeg_quality: 50
+  land_color: [0, 0, 255, 51]   # 藍 20% 透明(檢查用)
+
+# ── Step3：TIF+JSON → PNG / Mask / YOLO TXT ─────────────────────
+step3:
+  generate_png: true
+  generate_mask: true
+  generate_txt: true
+
+# ── Step4：組裝資料集(切分沿用 source_dataset 結構)──────────────────
+step4:
+  col_target: "DV5_SAR_All_reorganized_png"   # Excel 欄：原始資料集檔名
+  col_step3:  "DV5_All_TIF_CorrectName-JSON"  # Excel 欄：Step3 stem

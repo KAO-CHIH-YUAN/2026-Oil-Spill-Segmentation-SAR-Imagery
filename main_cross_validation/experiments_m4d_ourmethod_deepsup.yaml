@@ -1,0 +1,150 @@
+# =====================================================================
+# M4D 「我們的方法」(Binary 油污) — segformer_deepsup，LandNeutral(陸地→海值)
+#   最新方法: 陸地填「該圖海面均值」(neutral)，非塗白/黑。對標文獻 oil-class IoU。
+#
+# ★ 建資料集步驟 (這些資料集目前不存在，需依序跑前處理):
+#   (1) python preprocessing/m4d_ourmethod_rgb_neutral_fullres.py
+#        → M4D_RGBours__landNeutral__fullres (RGBours + 陸地→海值, 原尺寸, binary 0/255)
+#   (2) 切 512 patch (pos/neg): 編輯 preprocessing/m4d_ourmethod_patch_binary_ov128.py
+#        SOURCE_BASE_DIR = ".../M4D-ourMethod/M4D_RGBours__landNeutral__fullres"
+#        (輸出含 train_pos/train_neg/val_pos/val_neg/test_pos/test_neg)
+#   (3a) 全部版: merge 所有 pos+neg → 標準 train/val/test  (對應實驗1)
+#   (3b) HNM 版: 跑 HNM(EL2N/Submodular) 篩選負樣本 → Global_Dataset_Ratio_*  (對應實驗2)
+#   完成後把下面 dataset.path 改成實際輸出路徑，並將 run 改 true。
+#
+# 兩個實驗 (同資料/同切分/同 recipe，唯一差別 = 有無 HNM 篩選):
+#   1) 全部資料 (no HNM)  2) HNM 篩選
+# recipe 對齊 DV5 our-method (focal_iou_ls, batch12, 70ep, freeze10, grad_accum4, 同 aug)。
+# =====================================================================
+results_base_dir: '/home/yuan/Yuan/OIL_Project_12_7/result/model/M4D_ourMethod'
+excel_log_path: '/home/yuan/Yuan/OIL_Project_12_7/result/excel_log/M4D_ourMethod.xlsx'
+
+experiments:
+
+  # ---------- 實驗1: 全部資料 (no HNM) ----------
+  - experiment_name: 'M4D_deepsup_LandNeutral_patch_allData'
+    mode: 'train'
+    run: false                  # allData 已完成
+    architecture: 'segformer_deepsup'
+    architecture_cfg:
+      aux_loss_weight: 0.3
+      aux_delay_epochs: 10
+      aux_warmup_epochs: 30
+      in_channels: 3
+      hf_model_name: '/home/yuan/Yuan/OIL_Project_12_7/pretrain/local_model/segformer-b5'
+      aux_in_channels: 320
+      drop_path_rate: 0.3
+      classifier_dropout_prob: 0
+      land_as_class: false
+    cross_validation:
+      enabled: True
+      k_folds: 5
+      random_state: 42
+      val_ratio: 0.05
+    base_model: ''
+    dataset:
+      # ↓ 步驟3a 全部 patch merge 後的標準 train/val/test 路徑 (依實際輸出修改)
+      path: '/home/yuan/Yuan/OIL_Project_12_7/dataset/M4Ds/M4D-ourMethod/M4D_neutral__patch512ov128__allData'
+      nc: 1
+      names: ['Oil Spill']
+    imgsz: [512, 512]
+    train:
+      epochs: 70
+      loss_function: 'focal_iou_ls'
+      imgsz: [512, 512]
+      batch_size: 12
+      workers: 4
+      patience: 20
+      lr0: 0.0001
+      weight_decay: 0.02
+      amp: true
+      use_weighted_sampler: true
+      freeze_epochs: 10
+      degrees: 45
+      translate: 0.3
+      fliplr: 0.5
+      flipud: 0.5
+      coarse_dropout: 0.1
+      cutmix: 0.1
+      cutmix_alpha: 1.0
+      copy_paste: 0.1
+      gradient_accumulation_steps: 4
+      random_brightness: 0.2
+      random_contrast: 0.2
+    post_tests:
+      - test_name: 'M4D_OfficialTest_110'
+        dataset:
+          path: '/home/yuan/Yuan/OIL_Project_12_7/dataset/M4Ds/M4D-ourMethod/M4D_neutral__patch512ov128__allData'
+          nc: 1
+          names: ['Oil Spill']
+        reconstruction:
+          enabled: false       # 先取 patch-level oil IoU；要 whole-image 再開(需驗證重建)
+        evaluation_on_original:
+          enabled: false
+        draw_bounding_boxes: false
+        grad_cam:
+          enabled: false
+
+  # ---------- 實驗2: HNM 篩選 ----------
+  - experiment_name: 'M4D_deepsup_LandNeutral_patch_HNM'
+    mode: 'train'
+    run: true                   # HNM 已建好
+    architecture: 'segformer_deepsup'
+    architecture_cfg:
+      aux_loss_weight: 0.3
+      aux_delay_epochs: 10
+      aux_warmup_epochs: 30
+      in_channels: 3
+      hf_model_name: '/home/yuan/Yuan/OIL_Project_12_7/pretrain/local_model/segformer-b5'
+      aux_in_channels: 320
+      drop_path_rate: 0.3
+      classifier_dropout_prob: 0
+      land_as_class: false
+    cross_validation:
+      enabled: True
+      k_folds: 5
+      random_state: 42
+      val_ratio: 0.05
+    base_model: ''
+    dataset:
+      # ↓ 步驟3b HNM 輸出 (依實際 Global_Dataset_Ratio_* 路徑修改)
+      path: '/home/yuan/Yuan/OIL_Project_12_7/dataset/M4Ds/M4D-ourMethod/M4D_neutral__patch512ov128__HNM_ratio1.5/Global_Dataset_Ratio_1_1.5'
+      nc: 1
+      names: ['Oil Spill']
+    imgsz: [512, 512]
+    train:
+      epochs: 70
+      loss_function: 'focal_iou_ls'
+      imgsz: [512, 512]
+      batch_size: 12
+      workers: 4
+      patience: 20
+      lr0: 0.0001
+      weight_decay: 0.02
+      amp: true
+      use_weighted_sampler: true
+      freeze_epochs: 10
+      degrees: 45
+      translate: 0.3
+      fliplr: 0.5
+      flipud: 0.5
+      coarse_dropout: 0.1
+      cutmix: 0.1
+      cutmix_alpha: 1.0
+      copy_paste: 0.1
+      gradient_accumulation_steps: 4
+      random_brightness: 0.2
+      random_contrast: 0.2
+    post_tests:
+      - test_name: 'M4D_OfficialTest_110'
+        dataset:
+          path: '/home/yuan/Yuan/OIL_Project_12_7/dataset/M4Ds/M4D-ourMethod/M4D_neutral__patch512ov128__HNM_ratio1.5/Global_Dataset_Ratio_1_1.5'
+          nc: 1
+          names: ['Oil Spill']
+        reconstruction:
+          enabled: false       # 先取 patch-level oil IoU
+        evaluation_on_original:
+          enabled: false
+        draw_bounding_boxes: false
+        grad_cam:
+          enabled: false
